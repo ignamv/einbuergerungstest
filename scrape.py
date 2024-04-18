@@ -4,6 +4,7 @@ from itertools import count
 import selenium.webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support.select import Select
+from selenium.webdriver.common.by import By
 from db import conn, create_table
 
 # import sys
@@ -31,12 +32,12 @@ def scrape_all(driver):
     Each element is bundesland,image_bytes,answers,correct_answer_index
     `correct_answer_index` is 0-based
     """
-    driver.get("http://oet.bamf.de/pls/oetut/f?p=514:1:0::NO:::")
+    driver.get("https://oet.bamf.de/ords/oetut/f?p=514:1:0")
     # Need to refresh reference to element because of navigation between iterations
-    select = lambda: Select(driver.find_element_by_id("P1_BUL_ID"))
+    select = lambda: Select(driver.find_element(By.ID, "P1_BUL_ID"))
     for bundesland_index, bundesland in enumerate(iterate_select_options(select)):
         # Go to the questions
-        driver.find_element_by_xpath('//input[@value="Zum Fragenkatalog"]').click()
+        driver.find_element(By.XPATH, '//input[@value="Zum Fragenkatalog"]').click()
         # The general questions are the same for all Bundesländer,
         # only scrape them for the first Bundesland
         scrape_general_questions = bundesland_index == 0
@@ -44,7 +45,7 @@ def scrape_all(driver):
             general_question, image_bytes, answers, correct_answer_index = question
             effective_bundesland = bundesland if not general_question else None
             yield effective_bundesland, image_bytes, answers, correct_answer_index
-        driver.find_element_by_xpath('//input[@value="zur Startseite"]').click()
+        driver.find_element(By.XPATH, '//input[@value="zur Startseite"]').click()
 
 
 def scrape_bundesland(driver, scrape_general_questions):
@@ -58,7 +59,7 @@ def scrape_bundesland(driver, scrape_general_questions):
     first_question_index = (
         1 if scrape_general_questions else MAXIMUM_GENERAL_QUESTION_INDEX + 1
     )
-    Select(driver.find_element_by_id("P30_ROWNUM")).select_by_visible_text(
+    Select(driver.find_element(By.ID, "P30_ROWNUM")).select_by_visible_text(
         str(first_question_index)
     )
 
@@ -67,7 +68,7 @@ def scrape_bundesland(driver, scrape_general_questions):
         general_question = question_index <= MAXIMUM_GENERAL_QUESTION_INDEX
         yield general_question, image_bytes, answers, correct_answer_index
         try:
-            driver.find_element_by_name("GET_NEXT_ID").click()
+            driver.find_element(By.NAME, "GET_NEXT_ID").click()
         except NoSuchElementException:
             # Last question
             break
@@ -76,23 +77,23 @@ def scrape_bundesland(driver, scrape_general_questions):
 def scrape_question(driver):
     """Return question image, answers and correct answer index"""
     # Fetch image
-    img = driver.find_element_by_xpath("//img[contains(@src, 'APPLICATION_PROCESS')]")
+    img = driver.find_element(By.XPATH, "//img[contains(@src, 'APPLICATION_PROCESS')]")
     image_bytes = img.screenshot_as_png
     # Click first answer so we can look at the CSS to see which answer is correct
-    driver.find_element_by_xpath("//input[@type='radio']").click()
+    driver.find_element(By.XPATH, "//input[@type='radio']").click()
 
-    table = driver.find_element_by_xpath("//table[@class='t3borderless']")
-    rows = table.find_elements_by_tag_name("tr")
+    table = driver.find_element(By.XPATH, "//table[@class='t3borderless']")
+    rows = table.find_elements(By.TAG_NAME, "tr")
 
     answers = []
     for ii, row in enumerate(rows):
         correct = (
-            row.find_element_by_xpath("td[@headers='CHECKBOX']").get_attribute("style")
+            row.find_element(By.XPATH, "td[@headers='CHECKBOX']").get_attribute("style")
             == "background-color: green;"
         )
         if correct:
             correct_answer_index = ii
-        answer = row.find_element_by_xpath("td[@headers='ANTWORT']").text
+        answer = row.find_element(By.XPATH, "td[@headers='ANTWORT']").text
         answers.append(answer)
     return image_bytes, answers, correct_answer_index
 
