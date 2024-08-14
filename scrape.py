@@ -77,7 +77,12 @@ def scrape_bundesland(driver, scrape_general_questions):
 def scrape_question(driver):
     """Return question image, answers and correct answer index"""
     # Fetch image
-    img = driver.find_element(By.XPATH, "//img[contains(@src, 'APPLICATION_PROCESS')]")
+    try:
+        img = driver.find_element(By.XPATH, "//img[contains(@src, 'APPLICATION_PROCESS')]")
+    except Exception:
+        print("ups, we probably encountered a question with text instead of an image")
+        img = driver.find_element(By.ID, "P30_AUFGABENSTELLUNG")
+        print("text: ", img.text)
     image_bytes = img.screenshot_as_png
     # Click first answer so we can look at the CSS to see which answer is correct
     driver.find_element(By.XPATH, "//input[@type='radio']").click()
@@ -101,7 +106,9 @@ def scrape_question(driver):
 def scrape_to_db():
     """Create driver and scrape questions to database"""
     driver = selenium.webdriver.Firefox()
-    for question in scrape_all(driver):
+    all_scraped = list(scrape_all(driver))
+    print("found ", len(all_scraped), "questions")
+    for question in all_scraped:
         effective_bundesland, image_bytes, answers, correct_answer_index = question
         conn.execute(
             "INSERT INTO questions "
