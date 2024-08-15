@@ -1,5 +1,6 @@
 """Scrape website and store results in database"""
 
+import logging
 from itertools import count
 import selenium.webdriver
 from selenium.common.exceptions import NoSuchElementException
@@ -7,11 +8,7 @@ from selenium.webdriver.support.select import Select
 from selenium.webdriver.common.by import By
 from db import conn, create_table
 
-# import sys
-
-# driverpath = "/home/ignacio/packages/geckodriver"
-# if driverpath not in sys.path:
-# sys.path.append(driverpath)
+logger = logging.getLogger(__name__)
 
 MAXIMUM_GENERAL_QUESTION_INDEX = 300
 
@@ -36,6 +33,7 @@ def scrape_all(driver):
     # Need to refresh reference to element because of navigation between iterations
     select = lambda: Select(driver.find_element(By.ID, "P1_BUL_ID"))
     for bundesland_index, bundesland in enumerate(iterate_select_options(select)):
+        logger.debug("Scraping bundesland: %s", bundesland)
         # Go to the questions
         driver.find_element(By.XPATH, '//input[@value="Zum Fragenkatalog"]').click()
         # The general questions are the same for all Bundesländer,
@@ -64,6 +62,7 @@ def scrape_bundesland(driver, scrape_general_questions):
     )
 
     for question_index in count(first_question_index):
+        logger.debug("Scraping question %s", question_index)
         image_bytes, answers, correct_answer_index = scrape_question(driver)
         general_question = question_index <= MAXIMUM_GENERAL_QUESTION_INDEX
         yield general_question, image_bytes, answers, correct_answer_index
@@ -76,14 +75,14 @@ def scrape_bundesland(driver, scrape_general_questions):
 
 def scrape_question(driver):
     """Return question image, answers and correct answer index"""
-    # Fetch image
+    # Fetch question
     try:
-        img = driver.find_element(By.XPATH, "//img[contains(@src, 'APPLICATION_PROCESS')]")
+        question = driver.find_element(By.XPATH, "//img[contains(@src, 'APPLICATION_PROCESS')]")
     except Exception:
-        print("ups, we probably encountered a question with text instead of an image")
-        img = driver.find_element(By.ID, "P30_AUFGABENSTELLUNG")
-        print("text: ", img.text)
-    image_bytes = img.screenshot_as_png
+        logger.debug("Question image not found, looking for text")
+        question = driver.find_element(By.ID, "P30_AUFGABENSTELLUNG")
+        logger.debug("Found question text \"%s\"", question.text)
+    image_bytes = question.screenshot_as_png
     # Click first answer so we can look at the CSS to see which answer is correct
     driver.find_element(By.XPATH, "//input[@type='radio']").click()
 
@@ -107,7 +106,7 @@ def scrape_to_db():
     """Create driver and scrape questions to database"""
     driver = selenium.webdriver.Firefox()
     all_scraped = list(scrape_all(driver))
-    print("found ", len(all_scraped), "questions")
+    logger.info("Found %s questions", len(all_scraped))
     for question in all_scraped:
         effective_bundesland, image_bytes, answers, correct_answer_index = question
         conn.execute(
@@ -121,6 +120,14 @@ def scrape_to_db():
         conn.commit()
 
 
-if __name__ == "__main__":
+def main():
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
     create_table()
     scrape_to_db()
+
+
+if __name__ == "__main__":
+    main()
