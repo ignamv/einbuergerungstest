@@ -39,3 +39,7 @@ This will generate a csv file and a directory with the question images.
 ```
 python3 output.py
 ```
+
+## Acknowledgements
+
+Thanks to @nikste and @prepor for their contributions!
