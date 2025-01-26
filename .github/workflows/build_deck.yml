@@ -1,0 +1,24 @@
+name: Scrap questions and build Anki deck
+
+on:
+  workflow_dispatch:
+    branches: [ "main" ]
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Scrap and build in docker compose
+      run: docker compose up --abort-on-container-exit --build
+    - name: Upload Anki deck artifact
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: out/anki/einbuergerung-quiz*.apkg
+        token: ${{ secrets.GITHUB_TOKEN }}
+        allowUpdates: true
+        tag: v1.0.0
+        name: "Einbuergerung Quiz"
+        draft: false

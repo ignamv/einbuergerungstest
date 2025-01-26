@@ -1,6 +1,7 @@
 """Scrape website and store results in database"""
 
 import logging
+import os
 from itertools import count
 import selenium.webdriver
 from selenium.common.exceptions import NoSuchElementException
@@ -102,9 +103,25 @@ def scrape_question(driver):
     return image_bytes, answers, correct_answer_index
 
 
+def initialize_driver():
+    selenium_host = os.getenv("SELENIUM_HOST")
+    selenium_port = os.getenv("SELENIUM_PORT")
+
+    if selenium_host and selenium_port:
+        # Use remote WebDriver
+        selenium_url = f"http://{selenium_host}:{selenium_port}/wd/hub"
+        options = selenium.webdriver.FirefoxOptions()
+        options.add_argument('--headless')
+        driver = selenium.webdriver.Remote(command_executor=selenium_url, options=options)
+    else:
+        # Use local WebDriver
+        driver = selenium.webdriver.Firefox()
+
+    return driver
+
 def scrape_to_db():
     """Create driver and scrape questions to database"""
-    driver = selenium.webdriver.Firefox()
+    driver = initialize_driver()
     all_scraped = list(scrape_all(driver))
     logger.info("Found %s questions", len(all_scraped))
     for question in all_scraped:

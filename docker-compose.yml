@@ -1,0 +1,21 @@
+services:
+  firefox:
+    image: selenium/standalone-firefox:latest
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:4444/status | jq '.value.ready' | grep true"]
+      interval: 1s
+      timeout: 1s
+      retries: 15
+    init: true
+  scraper:
+    build: .
+    depends_on:
+      firefox:
+        condition: service_healthy
+    init: true
+    environment:
+      - SELENIUM_HOST=firefox
+      - SELENIUM_PORT=4444
+    working_dir: /out
+    volumes:
+      - ./out/:/out
